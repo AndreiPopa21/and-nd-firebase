@@ -35,11 +35,13 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     testImplementation 'junit:junit:4.12'
 
+    //noinspection GradleCompatible
     implementation 'com.android.support:design:24.2.0'
     implementation 'com.android.support:appcompat-v7:24.2.0'
 
     // Displaying images
     implementation 'com.github.bumptech.glide:glide:3.6.1'
     implementation 'com.google.firebase:firebase-core:16.0.1'
+    implementation 'com.google.firebase:firebase-database:16.0.1'
 }
 apply plugin: 'com.google.gms.google-services'
