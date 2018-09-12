@@ -57,7 +57,11 @@ public class MainActivity extends AppCompatActivity {
 
     private String mUsername;
 
+    //the entry point for our app to access the database
     private FirebaseDatabase mFirebaseDatabase;
+
+    //a class that references a specific part of our database
+    //this object is going to reference only the messages portion of the database
     private DatabaseReference mMessagesDatabaseReference;
 
     private ChildEventListener mChildEventListener;
@@ -69,7 +73,9 @@ public class MainActivity extends AppCompatActivity {
 
         mUsername = ANONYMOUS;
 
+        //initialize the access point
         mFirebaseDatabase= FirebaseDatabase.getInstance();
+        //which portion of the database are we referring to
         mMessagesDatabaseReference=mFirebaseDatabase.getReference().child("messages");
 
         // Initialize references to views
@@ -143,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
-                
+
             }
 
             @Override
@@ -153,9 +159,11 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-
+                 //throw new RuntimeException("You don't have permission to the read the data m8");
             }
         };
+        //the aforementioned event listener functions will only be triggered if
+        //the messages database portion was performed something on
         mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
 
     }
