@@ -16,6 +16,7 @@
 package com.google.firebase.udacity.friendlychat;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -36,6 +37,10 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.ChildEventListener;
@@ -43,6 +48,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String ANONYMOUS = "anonymous";
     public static final int DEFAULT_MSG_LENGTH_LIMIT = 1000;
     public static final int RC_SIGN_IN=1;
+    private static final int RC_PHOTO_PICKER =  2;
 
     private ListView mMessageListView;
     private MessageAdapter mMessageAdapter;
@@ -77,6 +86,10 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth mFirebaseAuth;
     //instance for the authentication listener
     private FirebaseAuth.AuthStateListener mAuthStateListener;
+    //instance of Firebase storage component
+    private FirebaseStorage mFirebaseStorage;
+    //like in the case of the realtime database, we are going to have a storage reference object
+    private StorageReference mChatPhotosStorageReference;
 
 
     private ChildEventListener mChildEventListener;
@@ -92,9 +105,12 @@ public class MainActivity extends AppCompatActivity {
         //initialize the access point
         mFirebaseDatabase= FirebaseDatabase.getInstance();
         mFirebaseAuth=FirebaseAuth.getInstance();
+        mFirebaseStorage=FirebaseStorage.getInstance();
 
-        //which portion of the database are we referring to
+        //which portion of the realtime database are we referring to
         mMessagesDatabaseReference=mFirebaseDatabase.getReference().child("messages");
+        //which portion of the storage database are we referring to
+        mChatPhotosStorageReference=mFirebaseStorage.getReference().child("chat_photos");
 
         // Initialize references to views
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -153,8 +169,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-
         mAuthStateListener= new FirebaseAuth.AuthStateListener() {
             @Override
             public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
@@ -178,6 +192,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+
+        // ImagePickerButton shows an image picker to upload a image for a message
+        mPhotoPickerButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //describe the intent for the photo picker
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/jpeg");
+                intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+                startActivityForResult(Intent.createChooser(intent, "Complete action using"), RC_PHOTO_PICKER);
+            }
+        });
 
     }
 
@@ -290,6 +316,47 @@ public class MainActivity extends AppCompatActivity {
             }else if(resultCode==RESULT_CANCELED){
                Toast.makeText(this,"Sign in cancelled!",Toast.LENGTH_SHORT).show();
                finish();
+            }
+        }
+
+        if(requestCode==RC_PHOTO_PICKER){
+            if(resultCode==RESULT_OK){
+                Uri selectedImageUri= data.getData();
+                //a reference to the specific photo
+                final StorageReference photoRef=
+                        mChatPhotosStorageReference.child(selectedImageUri.getLastPathSegment());
+                UploadTask uploadTask= photoRef.putFile(selectedImageUri);
+
+                //the downloadUrl link is retrieved via code posted in the official documentation
+                //https://firebase.google.com/docs/storage/android/upload-files#get_a_download_url
+                Task<Uri> urlTask = uploadTask.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+                    @Override
+                    public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+                        if (!task.isSuccessful()) {
+                            throw task.getException();
+                        }
+
+                        // Continue with the task to get the download URL
+                        return photoRef.getDownloadUrl();
+                    }
+                }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Uri> task) {
+                        if (task.isSuccessful()) {
+                            Uri downloadUri = task.getResult();
+                            FriendlyMessage friendlyMessage=
+                                    new FriendlyMessage(null,mUsername,downloadUri.toString());
+                            mMessagesDatabaseReference.push().setValue(friendlyMessage);
+
+                        } else {
+                            // Handle failures
+                            // ...
+                        }
+                    }
+                });
+
+            }else if(resultCode==RESULT_CANCELED){
+               //Bad luck!
             }
         }
 
